@@ -4,17 +4,63 @@ var mongoose = require('mongoose');
 
 var Schema = mongoose.Schema;
 
+var sortAnswers = function(a, b) {
+  // - negative a before b
+  // 0 no change, leave the order unchanged
+  // + positive if a is sorted after b
+
+  /* Explicit code
+    // first order by vote
+    if (a.votes === b.votes) {
+        if (a.updatedAt > b.updatedAt) {
+            return -1;
+        } else if (a.updatedAt < b.updatedAt) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+    */
+  // or we can write in a better way than the explicit code
+  if (a.votes === b.votes) {
+    return b.updatedAt - a.updatedAt;
+  }
+
+  return b.votes - a.votes;
+};
+
 var AnswerSchema = new Schema({
   text: String,
   createdAt: { type: Date, default: Date.now },
-  updateedAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
   votes: { type: Number, default: 0 }
+});
+
+//AnswerSchema.methods.update = function(updates, callback) {};
+// instead we can write
+AnswerSchema.method('update', function(updates, callback) {
+  Object.assign(this, updates, { updatedAt: new Date() });
+  this.parent().save(callback);
+});
+
+AnswerSchema.method('vote', function(vote, callback) {
+  if (vote === 'up') {
+    this.votes += 1;
+  } else {
+    this.votes -= 1;
+  }
+  this.parent().save(callback);
 });
 
 var QuestionSchema = new Schema({
   text: String,
   createdAt: { type: Date, default: Date.now },
   answers: [AnswerSchema]
+});
+
+QuestionSchema.pre('save', function(next) {
+  this.answers.sort(sortAnswers);
+  next();
 });
 
 var Question = mongoose.model('Question', QuestionSchema);
